@@ -1,0 +1,934 @@
+name: Build Moerat BPO Control System APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Create application
+        shell: bash
+        run: |
+          mkdir -p src
+
+          cat > package.json <<'EOF'
+          {
+            "name": "moerat-bpo-control-system",
+            "version": "1.0.0",
+            "private": true,
+            "type": "module",
+            "scripts": {
+              "dev": "vite",
+              "build": "vite build",
+              "preview": "vite preview"
+            },
+            "dependencies": {
+              "@capacitor/android": "7.4.4",
+              "@capacitor/core": "7.4.4",
+              "@capacitor/preferences": "7.0.2",
+              "react": "^19.1.1",
+              "react-dom": "^19.1.1"
+            },
+            "devDependencies": {
+              "@capacitor/cli": "7.4.4",
+              "@types/react": "^19.1.10",
+              "@types/react-dom": "^19.1.7",
+              "@vitejs/plugin-react": "^5.0.2",
+              "vite": "^7.1.5",
+              "typescript": "^5.9.2"
+            }
+          }
+          EOF
+
+          cat > index.html <<'EOF'
+          <!doctype html>
+          <html>
+            <head>
+              <meta charset="UTF-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <meta name="theme-color" content="#0b1020" />
+              <title>Moerat BPO Control System</title>
+            </head>
+            <body>
+              <div id="root"></div>
+              <script type="module" src="/src/main.tsx"></script>
+            </body>
+          </html>
+          EOF
+
+          cat > vite.config.ts <<'EOF'
+          import { defineConfig } from 'vite'
+          import react from '@vitejs/plugin-react'
+
+          export default defineConfig({
+            plugins: [react()]
+          })
+          EOF
+
+          cat > tsconfig.json <<'EOF'
+          {
+            "files": [],
+            "references": [
+              { "path": "./tsconfig.app.json" },
+              { "path": "./tsconfig.node.json" }
+            ]
+          }
+          EOF
+
+          cat > tsconfig.app.json <<'EOF'
+          {
+            "compilerOptions": {
+              "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+              "target": "ES2022",
+              "useDefineForClassFields": true,
+              "lib": ["ES2022", "DOM", "DOM.Iterable"],
+              "allowJs": false,
+              "skipLibCheck": true,
+              "esModuleInterop": true,
+              "allowSyntheticDefaultImports": true,
+              "strict": true,
+              "forceConsistentCasingInFileNames": true,
+              "module": "ESNext",
+              "moduleResolution": "Bundler",
+              "resolveJsonModule": true,
+              "isolatedModules": true,
+              "noEmit": true,
+              "jsx": "react-jsx"
+            },
+            "include": ["src"]
+          }
+          EOF
+
+          cat > tsconfig.node.json <<'EOF'
+          {
+            "compilerOptions": {
+              "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+              "target": "ES2023",
+              "lib": ["ES2023"],
+              "module": "ESNext",
+              "skipLibCheck": true,
+              "moduleResolution": "Bundler",
+              "allowImportingTsExtensions": true,
+              "verbatimModuleSyntax": true,
+              "moduleDetection": "force",
+              "noEmit": true,
+              "strict": true
+            },
+            "include": ["vite.config.ts"]
+          }
+          EOF
+
+          cat > capacitor.config.ts <<'EOF'
+          import type { CapacitorConfig } from '@capacitor/cli'
+
+          const config: CapacitorConfig = {
+            appId: 'com.moerat.bpo',
+            appName: 'Moerat BPO Control System',
+            webDir: 'dist'
+          }
+
+          export default config
+          EOF
+
+          cat > src/main.tsx <<'EOF'
+          import { StrictMode } from 'react'
+          import { createRoot } from 'react-dom/client'
+          import App from './App'
+          import './styles.css'
+
+          createRoot(document.getElementById('root')!).render(
+            <StrictMode>
+              <App />
+            </StrictMode>
+          )
+          EOF
+
+          cat > src/App.tsx <<'EOF'
+          import { useState } from 'react'
+
+          type Lead = {
+            id: number
+            company: string
+            contact: string
+            status: string
+            score: string
+          }
+
+          const initialLeads: Lead[] = [
+            { id: 1, company: 'Tiger Retail', contact: 'Sharon Belto', status: 'New', score: 'A' },
+            { id: 2, company: 'ARES Retail Solutions', contact: 'Jeff Harpster', status: 'New', score: 'A' },
+            { id: 3, company: 'Retail by MONA', contact: 'Brandon Singer', status: 'New', score: 'A' },
+            { id: 4, company: 'Comprehensive Retail Solutions', contact: 'Dilip Gyawali', status: 'Contacted', score: 'A' }
+          ]
+
+          const navItems = [
+            'Dashboard',
+            'Leads',
+            'Agents',
+            'Clients',
+            'Campaigns',
+            'Attendance',
+            'Tasks',
+            'Reports',
+            'Settings'
+          ]
+
+          function App() {
+            const [loggedIn, setLoggedIn] = useState(
+              localStorage.getItem('moerat_logged_in') === 'true'
+            )
+            const [email, setEmail] = useState('')
+            const [password, setPassword] = useState('')
+            const [page, setPage] = useState('Dashboard')
+            const [dark, setDark] = useState(true)
+            const [search, setSearch] = useState('')
+            const [leads, setLeads] = useState(initialLeads)
+
+            function login(e: React.FormEvent) {
+              e.preventDefault()
+
+              if (email === 'admin@moerat.co.za' && password === 'admin123') {
+                localStorage.setItem('moerat_logged_in', 'true')
+                setLoggedIn(true)
+              } else {
+                alert('Invalid login details')
+              }
+            }
+
+            function logout() {
+              localStorage.removeItem('moerat_logged_in')
+              setLoggedIn(false)
+            }
+
+            function addLead() {
+              const company = prompt('Company name')
+              if (!company) return
+
+              const contact = prompt('Contact name') || 'Unknown'
+
+              setLeads([
+                ...leads,
+                {
+                  id: Date.now(),
+                  company,
+                  contact,
+                  status: 'New',
+                  score: 'A'
+                }
+              ])
+            }
+
+            if (!loggedIn) {
+              return (
+                <div className="login-page">
+                  <div className="login-card">
+                    <div className="logo">M</div>
+                    <h1>Moerat BPO</h1>
+                    <p>Control System</p>
+
+                    <form onSubmit={login}>
+                      <label>Email</label>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        placeholder="Email address"
+                        required
+                      />
+
+                      <label>Password</label>
+                      <input
+                        type="password"
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        placeholder="Password"
+                        required
+                      />
+
+                      <button type="submit">Sign In</button>
+                    </form>
+
+                    <small>Initial administrator access</small>
+                  </div>
+                </div>
+              )
+            }
+
+            const filteredLeads = leads.filter(
+              lead =>
+                lead.company.toLowerCase().includes(search.toLowerCase()) ||
+                lead.contact.toLowerCase().includes(search.toLowerCase())
+            )
+
+            return (
+              <div className={dark ? 'app dark' : 'app'}>
+                <aside className="sidebar">
+                  <div className="brand">
+                    <div className="brand-logo">M</div>
+                    <div>
+                      <strong>MOERAT</strong>
+                      <span>BPO CONTROL</span>
+                    </div>
+                  </div>
+
+                  <nav>
+                    {navItems.map(item => (
+                      <button
+                        key={item}
+                        className={page === item ? 'nav active' : 'nav'}
+                        onClick={() => setPage(item)}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </nav>
+
+                  <div className="sidebar-bottom">
+                    <button className="nav" onClick={() => setDark(!dark)}>
+                      {dark ? '☀ Light Mode' : '☾ Dark Mode'}
+                    </button>
+
+                    <button className="nav logout" onClick={logout}>
+                      Logout
+                    </button>
+                  </div>
+                </aside>
+
+                <main className="main">
+                  <header className="topbar">
+                    <div>
+                      <h1>{page}</h1>
+                      <p>Moerat Customer Solutions</p>
+                    </div>
+                    <div className="user-badge">Administrator</div>
+                  </header>
+
+                  {page === 'Dashboard' && (
+                    <section>
+                      <div className="cards">
+                        <div className="card">
+                          <span>Leads in Pipeline</span>
+                          <strong>{leads.length}</strong>
+                          <small>Active prospects</small>
+                        </div>
+
+                        <div className="card">
+                          <span>Qualified Leads</span>
+                          <strong>{leads.filter(x => x.score === 'A').length}</strong>
+                          <small>High priority</small>
+                        </div>
+
+                        <div className="card">
+                          <span>Active Staff</span>
+                          <strong>20</strong>
+                          <small>Call centre capacity</small>
+                        </div>
+
+                        <div className="card">
+                          <span>Daily Target</span>
+                          <strong>300</strong>
+                          <small>Qualified leads</small>
+                        </div>
+                      </div>
+
+                      <div className="grid">
+                        <div className="panel">
+                          <h2>Lead Activity</h2>
+                          <div className="bars">
+                            {[45, 65, 40, 80, 55, 90, 70].map((height, i) => (
+                              <div className="bar-wrap" key={i}>
+                                <div className="bar" style={{ height: `${height}%` }} />
+                                <small>{['M','T','W','T','F','S','S'][i]}</small>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="panel">
+                          <h2>Team Status</h2>
+                          <div className="status-row">
+                            <span className="dot green" /> Online <strong>14</strong>
+                          </div>
+                          <div className="status-row">
+                            <span className="dot yellow" /> Away <strong>3</strong>
+                          </div>
+                          <div className="status-row">
+                            <span className="dot red" /> Offline <strong>3</strong>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="panel">
+                        <h2>Recent Leads</h2>
+                        <LeadTable leads={leads.slice(0, 5)} />
+                      </div>
+                    </section>
+                  )}
+
+                  {page === 'Leads' && (
+                    <section>
+                      <div className="page-actions">
+                        <input
+                          className="search"
+                          placeholder="Search leads..."
+                          value={search}
+                          onChange={e => setSearch(e.target.value)}
+                        />
+                        <button onClick={addLead}>+ Add Lead</button>
+                      </div>
+
+                      <div className="panel">
+                        <LeadTable leads={filteredLeads} />
+                      </div>
+                    </section>
+                  )}
+
+                  {page === 'Agents' && (
+                    <section>
+                      <div className="cards">
+                        {['Agent 001', 'Agent 002', 'Agent 003', 'Agent 004'].map(
+                          (agent, i) => (
+                            <div className="card" key={agent}>
+                              <span>{agent}</span>
+                              <strong>{88 - i * 7}%</strong>
+                              <small>Productivity</small>
+                              <div className="progress">
+                                <div style={{ width: `${88 - i * 7}%` }} />
+                              </div>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </section>
+                  )}
+
+                  {page !== 'Dashboard' &&
+                    page !== 'Leads' &&
+                    page !== 'Agents' && (
+                      <section className="panel empty">
+                        <div className="empty-icon">⚙</div>
+                        <h2>{page}</h2>
+                        <p>
+                          This module is connected to the Moerat BPO Control System
+                          foundation and ready for expansion.
+                        </p>
+                      </section>
+                    )}
+                </main>
+              </div>
+            )
+          }
+
+          function LeadTable({ leads }: { leads: Lead[] }) {
+            return (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Company</th>
+                      <th>Contact</th>
+                      <th>Status</th>
+                      <th>Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leads.map(lead => (
+                      <tr key={lead.id}>
+                        <td>{lead.company}</td>
+                        <td>{lead.contact}</td>
+                        <td><span className="tag">{lead.status}</span></td>
+                        <td><span className="score">{lead.score}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          }
+
+          export default App
+          EOF
+
+          cat > src/styles.css <<'EOF'
+          * {
+            box-sizing: border-box;
+          }
+
+          body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #0b1020;
+          }
+
+          button,
+          input {
+            font: inherit;
+          }
+
+          .app {
+            min-height: 100vh;
+            background: #f3f5f9;
+            color: #182033;
+            display: flex;
+          }
+
+          .app.dark {
+            background: #080c16;
+            color: #eef2ff;
+          }
+
+          .sidebar {
+            width: 240px;
+            min-height: 100vh;
+            background: #101625;
+            color: white;
+            padding: 22px 14px;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            left: 0;
+            top: 0;
+            bottom: 0;
+          }
+
+          .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 8px 25px;
+          }
+
+          .brand-logo,
+          .logo {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: grid;
+            place-items: center;
+            font-weight: 900;
+            background: #ffffff;
+            color: #101625;
+          }
+
+          .brand span {
+            display: block;
+            font-size: 10px;
+            opacity: .6;
+            margin-top: 3px;
+          }
+
+          nav {
+            display: grid;
+            gap: 5px;
+          }
+
+          .nav {
+            border: 0;
+            background: transparent;
+            color: #aeb8cc;
+            padding: 12px;
+            text-align: left;
+            border-radius: 9px;
+            cursor: pointer;
+          }
+
+          .nav:hover,
+          .nav.active {
+            background: #1d273b;
+            color: white;
+          }
+
+          .sidebar-bottom {
+            margin-top: auto;
+            display: grid;
+            gap: 5px;
+          }
+
+          .logout {
+            color: #ff8f8f;
+          }
+
+          .main {
+            width: calc(100% - 240px);
+            margin-left: 240px;
+            padding: 25px;
+          }
+
+          .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+          }
+
+          .topbar h1 {
+            margin: 0;
+            font-size: 28px;
+          }
+
+          .topbar p {
+            margin: 5px 0 0;
+            opacity: .6;
+          }
+
+          .user-badge {
+            background: #182238;
+            padding: 10px 15px;
+            border-radius: 20px;
+            color: #cdd6e8;
+          }
+
+          .cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 18px;
+          }
+
+          .card,
+          .panel {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 25px rgba(0,0,0,.06);
+          }
+
+          .dark .card,
+          .dark .panel {
+            background: #111827;
+            box-shadow: none;
+          }
+
+          .card span,
+          .card small {
+            display: block;
+            opacity: .65;
+          }
+
+          .card strong {
+            display: block;
+            font-size: 30px;
+            margin: 10px 0;
+          }
+
+          .grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 18px;
+            margin-bottom: 18px;
+          }
+
+          .panel h2 {
+            margin-top: 0;
+            font-size: 18px;
+          }
+
+          .bars {
+            height: 220px;
+            display: flex;
+            align-items: end;
+            justify-content: space-around;
+            gap: 10px;
+            padding-top: 20px;
+          }
+
+          .bar-wrap {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: end;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+          }
+
+          .bar {
+            width: 100%;
+            max-width: 45px;
+            min-height: 10px;
+            background: #667eea;
+            border-radius: 7px 7px 2px 2px;
+          }
+
+          .status-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px 0;
+            border-bottom: 1px solid #263044;
+          }
+
+          .status-row strong {
+            margin-left: auto;
+          }
+
+          .dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            display: inline-block;
+          }
+
+          .green { background: #36d399; }
+          .yellow { background: #fbbf24; }
+          .red { background: #f87171; }
+
+          .table-wrap {
+            overflow-x: auto;
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+          }
+
+          th,
+          td {
+            padding: 14px 10px;
+            text-align: left;
+            border-bottom: 1px solid #263044;
+          }
+
+          th {
+            opacity: .6;
+            font-size: 12px;
+            text-transform: uppercase;
+          }
+
+          .tag,
+          .score {
+            padding: 5px 9px;
+            border-radius: 7px;
+            font-size: 12px;
+            background: #1d273b;
+          }
+
+          .score {
+            font-weight: bold;
+          }
+
+          .page-actions {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 18px;
+          }
+
+          .search,
+          .login-card input {
+            border: 1px solid #354056;
+            background: #111827;
+            color: white;
+            border-radius: 10px;
+            padding: 12px 14px;
+            outline: none;
+          }
+
+          .search {
+            flex: 1;
+          }
+
+          button[type="submit"],
+          .page-actions button {
+            border: 0;
+            border-radius: 10px;
+            padding: 12px 18px;
+            background: #667eea;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+          }
+
+          .progress {
+            height: 7px;
+            background: #283247;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 12px;
+          }
+
+          .progress div {
+            height: 100%;
+            background: #667eea;
+          }
+
+          .empty {
+            text-align: center;
+            padding: 70px 25px;
+          }
+
+          .empty-icon {
+            font-size: 45px;
+            margin-bottom: 15px;
+          }
+
+          .login-page {
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background: #080c16;
+            padding: 20px;
+          }
+
+          .login-card {
+            width: min(420px, 100%);
+            background: #111827;
+            color: white;
+            padding: 35px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,.4);
+          }
+
+          .login-card .logo {
+            margin-bottom: 20px;
+          }
+
+          .login-card h1 {
+            margin: 0;
+          }
+
+          .login-card p {
+            opacity: .6;
+            margin-top: 5px;
+          }
+
+          .login-card form {
+            display: grid;
+            gap: 10px;
+            margin-top: 25px;
+          }
+
+          .login-card label {
+            font-size: 13px;
+            opacity: .7;
+          }
+
+          .login-card button {
+            margin-top: 10px;
+            border: 0;
+            border-radius: 10px;
+            padding: 13px;
+            background: #667eea;
+            color: white;
+            font-weight: bold;
+          }
+
+          .login-card small {
+            display: block;
+            margin-top: 20px;
+            opacity: .5;
+          }
+
+          @media (max-width: 900px) {
+            .sidebar {
+              width: 190px;
+            }
+
+            .main {
+              width: calc(100% - 190px);
+              margin-left: 190px;
+              padding: 18px;
+            }
+
+            .cards {
+              grid-template-columns: repeat(2, 1fr);
+            }
+          }
+
+          @media (max-width: 650px) {
+            .app {
+              display: block;
+            }
+
+            .sidebar {
+              position: relative;
+              width: 100%;
+              min-height: auto;
+              padding: 12px;
+            }
+
+            nav {
+              display: flex;
+              overflow-x: auto;
+            }
+
+            .nav {
+              white-space: nowrap;
+            }
+
+            .sidebar-bottom {
+              display: flex;
+              margin-top: 5px;
+            }
+
+            .main {
+              width: 100%;
+              margin-left: 0;
+              padding: 15px;
+            }
+
+            .cards,
+            .grid {
+              grid-template-columns: 1fr;
+            }
+
+            .topbar {
+              align-items: flex-start;
+              gap: 10px;
+            }
+
+            .user-badge {
+              font-size: 12px;
+            }
+          }
+          EOF
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build web application
+        run: npm run build
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: |
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: moerat-bpo-control-system-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
