@@ -28,7 +28,7 @@ const businessTabs = [
   { id: 'performance', label: 'Performance' },
   { id: 'risk-security', label: 'Risk & Security' },
   { id: 'documents', label: 'Documents' },
-  { id: 'activity', label: 'Activity' }
+  { id: 'activity', label: 'Activity & History' }
 ];
 
 export default function App() {
@@ -273,6 +273,7 @@ function BusinessesModule() {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     async function loadBusinesses() {
@@ -309,6 +310,13 @@ function BusinessesModule() {
     loadBusinesses();
   }, []);
 
+  const filteredBusinesses = businesses.filter((business) => {
+    const name = (business.name || business.business_name || '').toLowerCase();
+    const industry = (business.industry || business.business_type || '').toLowerCase();
+    const term = searchTerm.toLowerCase();
+    return name.includes(term) || industry.includes(term);
+  });
+
   const selectedBusiness =
     businesses.find((business) => business.id === selectedId) || businesses[0] || null;
 
@@ -344,10 +352,20 @@ function BusinessesModule() {
           <span className="meta-badge">{businesses.length} records</span>
         </div>
 
+        <input
+          type="text"
+          className="business-search"
+          placeholder="Search businesses..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+
         {businesses.length === 0 ? (
           <p className="muted">No businesses returned from Supabase.</p>
+        ) : filteredBusinesses.length === 0 ? (
+          <p className="muted">No businesses match your search.</p>
         ) : (
-          businesses.map((business) => {
+          filteredBusinesses.map((business) => {
             const name = business.name || business.business_name || 'Untitled Business';
             const statusText = getBusinessStatusText(business);
 
@@ -424,7 +442,7 @@ function BusinessesModule() {
 function BusinessTabContent({ tab, business }) {
   switch (tab) {
     case 'overview':
-      return <OverviewSection business={business} />;
+      return <OverviewBusinessSection business={business} />;
     case 'operations':
       return <ComingSoonSection title="Operations" tag="Not Connected" />;
     case 'finance':
@@ -444,29 +462,33 @@ function BusinessTabContent({ tab, business }) {
     case 'documents':
       return <ComingSoonSection title="Documents" tag="Coming Soon" />;
     case 'activity':
-      return <ComingSoonSection title="Activity" tag="Not Connected" />;
+      return <ComingSoonSection title="Activity & History" tag="Not Connected" />;
     default:
-      return <OverviewSection business={business} />;
+      return <OverviewBusinessSection business={business} />;
   }
 }
 
-function OverviewSection({ business }) {
-  const summaryItems = [
+function OverviewBusinessSection({ business }) {
+  const overviewItems = [
+    { label: 'Record ID', value: business.id || 'N/A' },
+    { label: 'Business Name', value: business.name || business.business_name || 'Not connected' },
+    { label: 'Division Number', value: business.division_number || business.division || 'Not connected' },
     { label: 'Status', value: getBusinessStatusText(business) },
     { label: 'Industry', value: business.industry || business.business_type || 'Not connected' },
     { label: 'Location', value: business.location || business.city || business.country || 'Not connected' },
-    { label: 'Primary Contact', value: business.contact_name || business.owner_name || 'Not connected' },
+    { label: 'Owner/Contact', value: business.owner_name || business.contact_name || 'Not connected' },
     { label: 'Email', value: business.contact_email || business.email || 'Not connected' },
     { label: 'Phone', value: business.contact_phone || business.phone || 'Not connected' },
-    { label: 'Updated', value: formatDate(business.updated_at || business.modified_at) }
+    { label: 'Created', value: formatDate(business.created_at) },
+    { label: 'Last Updated', value: formatDate(business.updated_at || business.modified_at) }
   ];
 
   return (
     <div className="business-section-grid">
       <div className="panel summary-panel">
-        <h3>Business Summary</h3>
+        <h3>Business Information</h3>
         <div className="detail-list">
-          {summaryItems.map((item) => (
+          {overviewItems.map((item) => (
             <BusinessField key={item.label} label={item.label} value={item.value} />
           ))}
         </div>
@@ -480,18 +502,32 @@ function OverviewSection({ business }) {
             <strong>{business.name || business.business_name || 'Not connected'}</strong>
           </div>
           <div className="snapshot-box">
-            <span>Owner</span>
+            <span>Owner/Contact</span>
             <strong>{business.owner_name || business.contact_name || 'Not connected'}</strong>
+          </div>
+          <div className="snapshot-box">
+            <span>Division</span>
+            <strong>{business.division_number || business.division || 'Not connected'}</strong>
+          </div>
+          <div className="snapshot-box">
+            <span>Status</span>
+            <strong>{getBusinessStatusText(business)}</strong>
+          </div>
+          <div className="snapshot-box">
+            <span>Industry</span>
+            <strong>{business.industry || business.business_type || 'Not connected'}</strong>
           </div>
           <div className="snapshot-box">
             <span>Region</span>
             <strong>{business.region || business.country || 'Not connected'}</strong>
           </div>
-          <div className="snapshot-box">
-            <span>Record Status</span>
-            <strong>{getBusinessStatusText(business)}</strong>
-          </div>
         </div>
+        {business.description && (
+          <div className="description-box">
+            <h4>Description</h4>
+            <p>{business.description}</p>
+          </div>
+        )}
       </div>
     </div>
   );
