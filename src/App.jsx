@@ -157,9 +157,7 @@ function Login() {
         <div className="logo large">M</div>
         <p className="eyebrow">MOERAT CUSTOMER SOLUTIONS</p>
         <h1>Command Center</h1>
-        <p className="muted">
-          AI-powered acquisition, sales and BPO operations.
-        </p>
+        <p className="muted">AI-powered acquisition, sales and BPO operations.</p>
 
         <form onSubmit={login}>
           <input
@@ -291,10 +289,13 @@ function BusinessesModule() {
           throw error;
         }
 
-        setBusinesses(data || []);
+        const list = data || [];
+        setBusinesses(list);
 
-        if ((data || []).length > 0) {
-          setSelectedId((currentId) => currentId ?? data[0].id);
+        if (list.length > 0) {
+          setSelectedId((currentId) => currentId ?? list[0].id);
+        } else {
+          setSelectedId(null);
         }
       } catch (err) {
         setBusinesses([]);
@@ -327,8 +328,8 @@ function BusinessesModule() {
         <span className="status status-warning">● DATA UNAVAILABLE</span>
         <h2>Business Management</h2>
         <p className="muted">
-          Supabase business data is not available right now. The management UI is
-          ready, but the data layer is not connected yet.
+          Supabase business data is not available right now. The management UI is ready,
+          but the data layer is not connected yet.
         </p>
         <p className="error-copy">{error}</p>
       </div>
